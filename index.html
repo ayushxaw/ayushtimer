@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Study Timer — Pomodoro + Brown Noise</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0a1a;
+    color: #fff;
+    overflow: hidden;
+  }
+  .bg-glow {
+    position: fixed;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    filter: blur(150px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow1 { background: #6366f1; top: -200px; left: -100px; }
+  .glow2 { background: #ec4899; bottom: -200px; right: -100px; }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    width: 420px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #a5a5c0;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .session-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #6366f1;
+    margin-bottom: 30px;
+    letter-spacing: 2px;
+  }
+  .session-label.break { color: #10b981; }
+
+  .timer-ring {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto 30px;
+  }
+  .timer-ring svg {
+    transform: rotate(-90deg);
+    width: 280px;
+    height: 280px;
+  }
+  .timer-ring .bg-circle {
+    fill: none;
+    stroke: #1e1e3a;
+    stroke-width: 8;
+  }
+  .timer-ring .progress-circle {
+    fill: none;
+    stroke: url(#gradient);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s ease;
+  }
+  .timer-display {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .timer-display .time {
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #6366f1, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .timer-display .sub {
+    font-size: 13px;
+    color: #666;
+    margin-top: -4px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 30px;
+  }
+  .btn {
+    padding: 12px 28px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 30px rgba(99,102,241,0.6); }
+  .btn-secondary {
+    background: #1e1e3a;
+    color: #a5a5c0;
+    border: 1px solid #2a2a4a;
+  }
+  .btn-secondary:hover { background: #2a2a4a; }
+  .btn-danger {
+    background: #dc2626;
+    color: #fff;
+  }
+
+  .noise-section {
+    background: #111128;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #1e1e3a;
+  }
+  .noise-section h3 {
+    font-size: 13px;
+    color: #a5a5c0;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .noise-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    justify-content: center;
+  }
+  .noise-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid #2a2a4a;
+    background: #1a1a2e;
+    color: #a5a5c0;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .noise-btn:hover { border-color: #6366f1; color: #6366f1; }
+  .noise-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+
+  .volume-slider {
+    -webkit-appearance: none;
+    width: 140px;
+    height: 4px;
+    border-radius: 2px;
+    background: #2a2a4a;
+    outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #6366f1;
+    cursor: pointer;
+  }
+  .volume-label {
+    font-size: 11px;
+    color: #666;
+    min-width: 35px;
+  }
+
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 20px;
+    font-size: 12px;
+    color: #555;
+  }
+  .stats span { color: #6366f1; font-weight: 700; }
+
+  .motivational {
+    margin-top: 16px;
+    font-size: 12px;
+    color: #444;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-glow glow1"></div>
+<div class="bg-glow glow2"></div>
+
+<div class="container">
+  <h1>📚 Study Mode</h1>
+  <div class="session-label" id="sessionLabel">FOCUS SESSION 1/4</div>
+
+  <div class="timer-ring">
+    <svg viewBox="0 0 280 280">
+      <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#6366f1"/>
+          <stop offset="100%" style="stop-color:#ec4899"/>
+        </linearGradient>
+      </defs>
+      <circle class="bg-circle" cx="140" cy="140" r="124"/>
+      <circle class="progress-circle" id="progressCircle" cx="140" cy="140" r="124"
+        stroke-dasharray="779.2" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-display">
+      <div class="time" id="timerDisplay">25:00</div>
+      <div class="sub" id="timerSub">tap start to begin</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn" onclick="toggleTimer()">▶ START</button>
+    <button class="btn btn-secondary" onclick="resetTimer()">↺ RESET</button>
+    <button class="btn btn-secondary" onclick="skipSession()">⏭ SKIP</button>
+  </div>
+
+  <div class="noise-section">
+    <h3>🎧 Background Noise</h3>
+    <div class="noise-controls">
+      <button class="noise-btn" id="noiseBtn" onclick="toggleNoise()">🔇</button>
+      <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="30" oninput="setVolume(this.value)">
+      <span class="volume-label" id="volumeLabel">30%</span>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div>Completed: <span id="completedCount">0</span> sessions</div>
+    <div>Total focus: <span id="totalMinutes">0</span> min</div>
+  </div>
+
+  <div class="motivational" id="motivational">"You don't need motivation. You just need to start."</div>
+</div>
+
+<script>
+  // Timer config
+  const FOCUS_TIME = 25 * 60;
+  const SHORT_BREAK = 5 * 60;
+  const LONG_BREAK = 15 * 60;
+
+  let timeLeft = FOCUS_TIME;
+  let totalTime = FOCUS_TIME;
+  let isRunning = false;
+  let interval = null;
+  let sessionNum = 1;
+  let isBreak = false;
+  let completedSessions = 0;
+  let totalFocusMinutes = 0;
+
+  const circumference = 2 * Math.PI * 124;
+
+  const quotes = [
+    '"You don\'t need motivation. You just need to start."',
+    '"The pain of studying is temporary. The pain of failing is forever."',
+    '"Your future self will thank you for this."',
+    '"One more page. Then one more. That\'s how it works."',
+    '"You\'re not studying biology. You\'re buying marks."',
+    '"Every minute now = easier exam later."',
+    '"CSB students don\'t quit. They debug and retry."',
+    '"25 minutes. That\'s all. You got this."',
+    '"Mam\'s tricky questions won\'t trick you if you actually study."',
+    '"Think about how good 90% will feel."'
+  ];
+
+  function updateDisplay() {
+    const mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    const secs = (timeLeft % 60).toString().padStart(2, '0');
+    document.getElementById('timerDisplay').textContent = `${mins}:${secs}`;
+
+    const progress = (1 - timeLeft / totalTime) * circumference;
+    document.getElementById('progressCircle').style.strokeDashoffset = circumference - progress;
+
+    document.title = `${mins}:${secs} — ${isBreak ? 'Break' : 'Focus'}`;
+  }
+
+  function toggleTimer() {
+    if (isRunning) {
+      clearInterval(interval);
+      isRunning = false;
+      document.getElementById('startBtn').textContent = '▶ START';
+      document.getElementById('timerSub').textContent = 'paused';
+    } else {
+      isRunning = true;
+      document.getElementById('startBtn').textContent = '⏸ PAUSE';
+      document.getElementById('timerSub').textContent = isBreak ? 'take a breather' : 'stay focused!';
+      interval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          isRunning = false;
+          sessionComplete();
+        }
+        updateDisplay();
+      }, 1000);
+    }
+  }
+
+  function sessionComplete() {
+    // Play alarm
+    playAlarm();
+
+    if (!isBreak) {
+      completedSessions++;
+      totalFocusMinutes += 25;
+      document.getElementById('completedCount').textContent = completedSessions;
+      document.getElementById('totalMinutes').textContent = totalFocusMinutes;
+    }
+
+    // Switch session
+    if (isBreak) {
+      isBreak = false;
+      sessionNum = (sessionNum % 4) + 1;
+      timeLeft = FOCUS_TIME;
+      totalTime = FOCUS_TIME;
+    } else {
+      isBreak = true;
+      if (sessionNum === 4) {
+        timeLeft = LONG_BREAK;
+        totalTime = LONG_BREAK;
+      } else {
+        timeLeft = SHORT_BREAK;
+        totalTime = SHORT_BREAK;
+      }
+    }
+
+    updateSessionLabel();
+    updateDisplay();
+    document.getElementById('startBtn').textContent = '▶ START';
+    document.getElementById('motivational').textContent = quotes[Math.floor(Math.random() * quotes.length)];
+
+    // Auto-start after 2 seconds
+    setTimeout(() => {
+      if (!isRunning) toggleTimer();
+    }, 3000);
+  }
+
+  function updateSessionLabel() {
+    const label = document.getElementById('sessionLabel');
+    if (isBreak) {
+      label.textContent = sessionNum === 4 ? '☕ LONG BREAK' : '☕ SHORT BREAK';
+      label.className = 'session-label break';
+    } else {
+      label.textContent = `FOCUS SESSION ${sessionNum}/4`;
+      label.className = 'session-label';
+    }
+  }
+
+  function resetTimer() {
+    clearInterval(interval);
+    isRunning = false;
+    isBreak = false;
+    timeLeft = FOCUS_TIME;
+    totalTime = FOCUS_TIME;
+    document.getElementById('startBtn').textContent = '▶ START';
+    document.getElementById('timerSub').textContent = 'tap start to begin';
+    updateSessionLabel();
+    updateDisplay();
+  }
+
+  function skipSession() {
+    clearInterval(interval);
+    isRunning = false;
+    sessionComplete();
+  }
+
+  // Brown noise
+  let audioCtx = null;
+  let noiseNode = null;
+  let gainNode = null;
+  let noiseActive = false;
+
+  function createBrownNoise() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const bufferSize = 4096;
+    noiseNode = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.3;
+
+    let lastOut = 0.0;
+    noiseNode.onaudioprocess = function(e) {
+      const output = e.outputBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = output[i];
+        output[i] *= 3.5;
+      }
+    };
+    noiseNode.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+  }
+
+  function toggleNoise() {
+    const btn = document.getElementById('noiseBtn');
+    if (!noiseActive) {
+      if (!audioCtx) createBrownNoise();
+      else {
+        noiseNode.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+      }
+      noiseActive = true;
+      btn.textContent = '🔊';
+      btn.classList.add('active');
+    } else {
+      noiseNode.disconnect();
+      noiseActive = false;
+      btn.textContent = '🔇';
+      btn.classList.remove('active');
+    }
+  }
+
+  function setVolume(val) {
+    document.getElementById('volumeLabel').textContent = val + '%';
+    if (gainNode) gainNode.gain.value = val / 100;
+  }
+
+  function playAlarm() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 800;
+    g.gain.value = 0.3;
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start();
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+    osc.stop(audioCtx.currentTime + 1.5);
+    // Second beep
+    setTimeout(() => {
+      const osc2 = audioCtx.createOscillator();
+      const g2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.value = 1000;
+      g2.gain.value = 0.3;
+      osc2.connect(g2);
+      g2.connect(audioCtx.destination);
+      osc2.start();
+      g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+      osc2.stop(audioCtx.currentTime + 1);
+    }, 500);
+  }
+
+  updateDisplay();
+</script>
+</body>
+</html>
